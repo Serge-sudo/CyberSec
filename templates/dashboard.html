@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="mt-5">
+        <h1>Dashboard</h1>
+        <p>Welcome, {{ session['username'] }}!</p>
+    </div>
+</div>
+{% endblock %}

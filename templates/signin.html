@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Sign In{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="mt-5">
+        <h1>Sign In</h1>
+        <form method="post">
+            <div class="mb-3 position-relative">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+            </div>
+            <div class="mb-3 position-relative">
+                <label for="password" class="form-label">Password</label>
+                <div class="input-group">
+                <input type="password" class="form-control" id="password" name="password" required>
+                <span class="position-absolute top-50 end-0 translate-middle-y me-3">
+                  <i class="bi bi-eye-slash" id="togglePassword" style="cursor: pointer;"></i>
+              </span>
+            </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Sign In</button>
+        </form>
+        <p class="mt-3">Don't have an account? <a href="{{ url_for('signup') }}">Sign Up</a></p>
+        <p>Forgot your password? <a href="{{ url_for('reset_password') }}">Reset Password</a></p>
+    </div>
+</div>
+{% endblock %}
