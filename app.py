@@ -11,9 +11,11 @@ app.secret_key = 'CyberSec123+#!'
 
 DATABASE = 'users.db'
 
-PASSWORDRESETMIN = 2
+PASSWORDRESETMIN = 12000000000
 FAILEDATTEMPTCNT = 3
 FAILEDATTEMPTBLOCKMIN = 1
+
+ROLES = ['admin', 'project_manager', 'user']
 
 def getDBConnection():
     conn = sqlite3.connect(DATABASE)
@@ -35,6 +37,18 @@ def loginRequired(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def roleRequired(roles):
+    def wrapper(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'role' not in session or session['role'] not in roles:
+                flash('You do not have permission to access this page.')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return wrapper
+
+
 def validateUsername(username):
     errors = []
     if len(username) < 5:
@@ -42,6 +56,7 @@ def validateUsername(username):
     if not re.match(r'^[A-Za-z][A-Za-z0-9_.]+$', username):
         errors.append('Username must start with a letter and contain only letters, digits, underscores, or periods.')
     return errors
+
 
 def validatePassword(password):
     errors = []
@@ -53,9 +68,10 @@ def validatePassword(password):
         errors.append('Password must contain at least one lowercase letter.')
     if not re.search(r'\d', password):
         errors.append('Password must contain at least one digit.')
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+    if not re.search(r'[!+@#$%^&*(),.?":{}|<>]', password):
         errors.append('Password must contain at least one special character.')
     return errors
+
 
 def validateSecretPhrase(secret_phrase):
     errors = []
@@ -63,9 +79,11 @@ def validateSecretPhrase(secret_phrase):
         errors.append('Secret phrase must be at least 6 characters long.')
     return errors
 
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/signup', methods=('GET', 'POST'))
 def signup():
@@ -74,7 +92,12 @@ def signup():
         password = request.form['password']
         confirm_password = request.form['confirm_password']
         secret_phrase = request.form['secret_phrase']
+        role = request.form['role']
         created_at = datetime.now()
+
+        if role not in ROLES:
+            flash('Invalid role selected.')
+            return redirect(url_for('signup'))
 
         if password != confirm_password:
             flash('Passwords do not match.')
@@ -103,14 +126,15 @@ def signup():
             conn.close()
             return redirect(url_for('signup'))
 
-        conn.execute('INSERT INTO users (username, password, secret_phrase, password_set_time) VALUES (?, ?, ?, ?)',
-                     (username, hashed_password, hashed_secret_phrase, created_at))
+        conn.execute('INSERT INTO users (username, password, secret_phrase, password_set_time, role) VALUES (?, ?, ?, ?, ?)',
+                     (username, hashed_password, hashed_secret_phrase, created_at, role))
         conn.commit()
         conn.close()
         flash('Account created successfully! Please sign in.')
         return redirect(url_for('signin'))
 
-    return render_template('signup.html')
+    return render_template('signup.html', roles=ROLES)
+
 
 @app.route('/signin', methods=('GET', 'POST'))
 def signin():
@@ -142,6 +166,7 @@ def signin():
                     return redirect(url_for('reset_password'))
 
                 session['username'] = username
+                session['role'] = user['role']
                 conn.execute('UPDATE users SET failed_attempts = 0 WHERE username = ?', (username,))
                 conn.commit()
                 conn.close()
@@ -167,10 +192,46 @@ def signin():
 
     return render_template('signin.html')
 
+
 @app.route('/dashboard')
 @loginRequired
 def dashboard():
-    return render_template('dashboard.html')
+    conn = getDBConnection()
+    articles = conn.execute('SELECT * FROM articles').fetchall()
+    conn.close()
+    return render_template('dashboard.html', articles=articles)
+
+
+@app.route('/add_article', methods=('GET', 'POST'))
+@loginRequired
+@roleRequired(['admin', 'project_manager'])
+def add_article():
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+        created_at = datetime.now()
+
+        conn = getDBConnection()
+        conn.execute('INSERT INTO articles (title, content, created_at) VALUES (?, ?, ?)', (title, content, created_at))
+        conn.commit()
+        conn.close()
+        flash('Article added successfully!')
+        return redirect(url_for('dashboard'))
+
+    return render_template('add_article.html')
+
+
+@app.route('/delete_article/<int:article_id>')
+@loginRequired
+@roleRequired(['admin'])
+def delete_article(article_id):
+    conn = getDBConnection()
+    conn.execute('DELETE FROM articles WHERE id = ?', (article_id,))
+    conn.commit()
+    conn.close()
+    flash('Article deleted successfully!')
+    return redirect(url_for('dashboard'))
+
 
 @app.route('/reset_password', methods=('GET', 'POST'))
 def reset_password():
@@ -218,6 +279,7 @@ def reset_password():
 @app.route('/logout')
 def logout():
     session.pop('username', None)
+    session.pop('role', None)
     flash('You have been signed out.')
     return redirect(url_for('signin'))
 
