@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="mt-5">
+        <h3>Welcome to the Dashboard, {{ session['username'] }}!</h3>
+        <h5>Articles</h5>
+        <ul>
+            {% for article in articles %}
+                <li>
+                    <strong>{{ article.title }}</strong><br>
+                    {{ article.content }}<br>
+                    {% if session['role'] == 'admin' %}
+                        <a href="{{ url_for('delete_article', article_id=article.id) }}">Delete</a>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    
+        {% if session['role'] in ['admin', 'project_manager'] %}
+            <a href="{{ url_for('add_article') }}">Add New Article</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
